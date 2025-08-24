@@ -1,7 +1,6 @@
 {
   "functions": {
-    "api/brief.js": {
-      "runtime": "nodejs18.x",
+    "pages/api/**/*.js": {
       "memory": 1024,
       "maxDuration": 20
     }
