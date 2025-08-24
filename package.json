@@ -1,7 +1,7 @@
 {
   "name": "eu-brief-mvp",
   "private": true,
-  "engines": { "node": ">=18.17.0" }
+  "engines": { "node": ">=18.17.0" },
   "version": "0.1.0",
   "scripts": {
     "dev": "next dev",
