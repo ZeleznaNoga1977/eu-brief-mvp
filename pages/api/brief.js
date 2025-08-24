@@ -6,10 +6,10 @@ import { extractFields } from "../../lib/extract";
 import OpenAI from "openai";
 
 export const config = {
-  api: { bodyParser: false }, // we handle multipart with formidable
+  api: { bodyParser: false }, // handle multipart with formidable
 };
 
-// -------- helpers --------
+// ---------- helpers ----------
 function basicBrief(f) {
   const parts = [];
   if (f.callId) parts.push(`Call: ${f.callId}`);
@@ -32,41 +32,49 @@ function basicBrief(f) {
 }
 
 async function polishWithLLM(fields) {
-  if (!process.env.OPENAI_API_KEY) {
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  if (!apiKey) {
     return { text: null, error: "NO_API_KEY" };
   }
-  try {
-    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const model = process.env.MODEL_NAME || "gpt-4o-mini";
 
-    const prompt = `You are a compliance-first editor. The input is trusted JSON extracted from an EU call.
+  const client = new OpenAI({ apiKey });
+  const model = (process.env.MODEL_NAME || "gpt-4o-mini").trim();
 
+  const system = `You are a compliance-first editor. The input is trusted JSON extracted from an EU call.
 Tasks:
 1) Produce a concise 150–180 word brief.
 2) Then output a 6–8 item "Key facts" list with: Programme (if known), Call ID, Deadlines, Budget, TRL, Eligibility, and Official link if present.
+Rules: Use ONLY the provided JSON; if a field is missing, write "N/A". Do not speculate. Neutral, factual tone.`;
 
-Rules:
-- Use ONLY the provided JSON; if a field is missing, write "N/A".
-- Do not speculate or invent facts.
-- Keep tone neutral and factual.
+  const user = `JSON:\n${JSON.stringify(fields, null, 2)}`;
 
-JSON:
-${JSON.stringify(fields, null, 2)}`;
-
-    const resp = await client.chat.completions.create({
+  try {
+    // Use the Responses API (recommended in the current OpenAI Node SDK)
+    const resp = await client.responses.create({
       model,
-      messages: [{ role: "user", content: prompt }],
+      input: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
       temperature: 0.2,
     });
 
-    const content = resp.choices?.[0]?.message?.content?.trim() || null;
-    return { text: content, error: content ? null : "EMPTY_RESPONSE" };
+    // Helper to get a single text string
+    const content =
+      resp.output_text ||
+      resp?.output?.map?.(o =>
+        o?.content?.map?.(c => c?.text?.value || "").join("")
+      ).join("") ||
+      null;
+
+    return { text: content?.trim() || null, error: content ? null : "EMPTY_RESPONSE" };
   } catch (e) {
-    return { text: null, error: e?.message || "OPENAI_ERROR" };
+    const msg = (e && (e.message || e.toString())) || "OPENAI_ERROR";
+    return { text: null, error: msg };
   }
 }
 
-// -------- handler --------
+// ---------- handler ----------
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -75,13 +83,13 @@ export default async function handler(req, res) {
 
   const form = formidable({
     multiples: false,
-    maxFileSize: 100 * 1024 * 1024, // 100MB (actual Vercel upload limit may be lower)
+    maxFileSize: 100 * 1024 * 1024, // note: Vercel request limit may be lower
     keepExtensions: false,
   });
 
   let filePath;
   try {
-    // parse multipart form-data
+    // 1) Parse multipart form-data
     const { files } = await new Promise((resolve, reject) => {
       form.parse(req, (err, fields, files) => {
         if (err) return reject(err);
@@ -89,36 +97,19 @@ export default async function handler(req, res) {
       });
     });
 
-    // get uploaded file (field name: "pdf")
+    // 2) Get uploaded file
     const f = files?.pdf || files?.file;
     if (!f) return res.status(400).json({ error: "No PDF uploaded (use field name 'pdf')." });
     filePath = Array.isArray(f) ? f[0].filepath : f.filepath;
 
-    // read file → extract text
+    // 3) Read file → extract text
     const data = await fs.readFile(filePath);
     const parsed = await pdfParse(data);
     const text = parsed.text || "";
 
-    // deterministic extraction → fields JSON
+    // 4) Deterministic extraction → fields JSON
     const fields = extractFields(text);
 
-    // optional LLM polish
+    // 5) Optional LLM polish
     const { text: llmText, error: llmError } = await polishWithLLM(fields);
-    const usedLLM = !!llmText;
-    const brief = usedLLM ? `【LLM polished】\n\n${llmText}` : basicBrief(fields);
-
-    // clean up temp file
-    try {
-      await fs.writeFile(filePath, "");
-      await fs.unlink(filePath);
-    } catch {}
-
-    // respond
-    return res.status(200).json({ brief, fields, usedLLM, llmError: usedLLM ? null : llmError || null });
-  } catch (e) {
-    if (filePath) {
-      try { await fs.unlink(filePath); } catch {}
-    }
-    return res.status(500).json({ error: "Failed to process PDF." });
-  }
-}
+    const usedLLM = !!ll
