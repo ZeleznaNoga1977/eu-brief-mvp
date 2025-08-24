@@ -2,7 +2,7 @@
 import formidable from "formidable";
 import fs from "fs/promises";
 import pdfParse from "pdf-parse";
-import { extractFields } from "../../lib/extract";
+import { extractFields } from "../../lib/extract2"; // <- uses the new extractor
 import OpenAI from "openai";
 
 export const config = {
