@@ -50,7 +50,7 @@ export default function Home(){
   return (
     <main style={{ maxWidth: 840, margin: "40px auto", padding: 16, fontFamily: "system-ui, sans-serif" }}>
       <h1>EU Call Brief (MVP)</h1>
-      <p>Paste a Topic URL <em>or</em> upload a PDF. We’ll fetch the page, follow the Work Programme PDF, merge facts, and (optionally) polish with an LLM. No email. No storage.</p>
+      <p>Paste a Topic URL <em>or</em> upload a PDF. We’ll fetch the page, follow the Work Programme PDF, merge facts, and (optionally) polish with an LLM.</p>
 
       <form onSubmit={handleSubmit} style={{ display:"grid", gap: 8, alignItems:"center", gridTemplateColumns:"1fr auto" }}>
         <input
