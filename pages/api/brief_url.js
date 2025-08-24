@@ -1,7 +1,7 @@
 // pages/api/brief_url.js
 import OpenAI from "openai";
 import pdfParse from "pdf-parse";
-import { extractFields } from "../../lib/extract2"; // <- uses the new extractor
+import { extractFields } from "../../lib/extract";
 
 export const config = { api: { bodyParser: true } };
 
